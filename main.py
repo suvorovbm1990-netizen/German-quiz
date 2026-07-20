@@ -1,7 +1,14 @@
+import streamlit as st
 import random
 
-# Полная база из 31 слова и выражения из сказки
-vocabulary = [
+# Настройка страницы
+st.set_page_config(page_title="Немецкая Викторина", page_icon="🇩🇪", layout="centered")
+
+st.title("🇩🇪 Викторина по немецким словам и фразам")
+st.write("Проверьте и закрепите знания 31 слова и выражения из сказки!")
+
+# Полная база из 31 слова и выражения
+VOCABULARY = [
     # 1. Идиомы и фразы
     {
         "question": "Что означает «vor lauter ...»?",
@@ -171,46 +178,77 @@ vocabulary = [
     }
 ]
 
-def run_quiz():
-    score = 0
-    questions = vocabulary.copy()
-    random.shuffle(questions)  # Перемешиваем вопросы
-    
-    print("=== ВИКТОРИНА ПО НЕМЕЦКИМ СЛОВАМ И ФРАЗАМ (31 ВОПРОС) ===\n")
-    
-    for i, item in enumerate(questions, 1):
-        print(f"Вопрос {i}/{len(questions)}: {item['question']}")
-        
-        options = item['options'].copy()
-        random.shuffle(options)  # Перемешиваем варианты
-        
-        for idx, option in enumerate(options, 1):
-            print(f"  {idx}. {option}")
-            
-        while True:
-            try:
-                user_choice = int(input("\nВаш ответ (введите номер 1-4): "))
-                if 1 <= user_choice <= 4:
-                    break
-                print("Пожалуйста, введите число от 1 до 4.")
-            except ValueError:
-                print("Нужно ввести цифру!")
-                
-        selected_option = options[user_choice - 1]
-        if selected_option == item['answer']:
-            print("✨ Правильно!\n")
-            score += 1
-        else:
-            print(f"❌ Неправильно. Правильный ответ: {item['answer']}\n")
-            
-    print("=" * 45)
-    print(f"Игра окончена! Ваш результат: {score} из {len(questions)}")
-    if score == len(questions):
-        print("🏆 Идеально! Вы выучили все 31 выражение!")
-    elif score >= len(questions) // 2:
-        print("👍 Хороший результат! Повторите ещё разок для закрепления.")
-    else:
-        print("📚 Стоит пройти викторину ещё раз.")
+# Инициализация состояния
+if 'current_index' not in st.session_state:
+    st.session_state.current_index = 0
+    st.session_state.score = 0
+    st.session_state.questions = VOCABULARY.copy()
+    random.shuffle(st.session_state.questions)
+    st.session_state.answered = False
+    st.session_state.selected_option = None
 
-if __name__ == "__main__":
-    run_quiz()
+def restart_quiz():
+    st.session_state.current_index = 0
+    st.session_state.score = 0
+    st.session_state.questions = VOCABULARY.copy()
+    random.shuffle(st.session_state.questions)
+    st.session_state.answered = False
+    st.session_state.selected_option = None
+
+q_index = st.session_state.current_index
+total_questions = len(st.session_state.questions)
+
+if q_index < total_questions:
+    st.progress((q_index) / total_questions)
+    current_q = st.session_state.questions[q_index]
+    
+    st.subheader(f"Вопрос {q_index + 1} из {total_questions}")
+    st.write(f"### {current_q['question']}")
+
+    # Сохраняем перемешанные варианты ответов
+    options_key = f"options_{q_index}"
+    if options_key not in st.session_state:
+        opts = current_q['options'].copy()
+        random.shuffle(opts)
+        st.session_state[options_key] = opts
+    
+    options = st.session_state[options_key]
+
+    selected = st.radio("Выберите вариант ответа:", options, key=f"radio_{q_index}", disabled=st.session_state.answered)
+
+    if not st.session_state.answered:
+        if st.button("Ответить", type="primary"):
+            st.session_state.answered = True
+            st.session_state.selected_option = selected
+            if selected == current_q['answer']:
+                st.session_state.score += 1
+            st.rerun()
+    else:
+        if st.session_state.selected_option == current_q['answer']:
+            st.success("✨ Правильно!")
+        else:
+            st.error(f"❌ Неправильно. Правильный ответ: **{current_q['answer']}**")
+
+        if st.button("Следующий вопрос ➡️"):
+            st.session_state.current_index += 1
+            st.session_state.answered = False
+            st.session_state.selected_option = None
+            st.rerun()
+
+else:
+    st.progress(1.0)
+    st.balloons()
+    st.header("🎉 Игра окончена!")
+    score = st.session_state.score
+    st.subheader(f"Ваш результат: **{score}** из **{total_questions}**")
+
+    if score == total_questions:
+        st.success("🏆 Идеально! Вы выучили все слова!")
+    elif score >= total_questions // 2:
+        st.info("👍 Отличный результат!")
+    else:
+        st.warning("📚 Стоит пройти викторину еще раз.")
+
+    if st.button("Пройти викторину заново 🔄"):
+        restart_quiz()
+        st.rerun()
